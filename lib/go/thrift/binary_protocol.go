@@ -24,7 +24,6 @@ import (
 	"fmt"
 	"io"
 	"math"
-	"strings"
 )
 
 type TBinaryProtocol struct {
@@ -216,7 +215,7 @@ func (p *TBinaryProtocol) WriteDouble(value float64) error {
 }
 
 func (p *TBinaryProtocol) WriteString(value string) error {
-	return p.WriteBinaryFromReader(strings.NewReader(value), len(value))
+	return p.WriteBinary([]byte(value))
 }
 
 func (p *TBinaryProtocol) WriteBinary(value []byte) error {
@@ -225,15 +224,6 @@ func (p *TBinaryProtocol) WriteBinary(value []byte) error {
 		return e
 	}
 	_, err := p.trans.Write(value)
-	return NewTProtocolException(err)
-}
-
-func (p *TBinaryProtocol) WriteBinaryFromReader(reader io.Reader, size int) error {
-	e := p.WriteI32(int32(size))
-	if e != nil {
-		return e
-	}
-	_, err := io.CopyN(p.trans, reader, int64(size))
 	return NewTProtocolException(err)
 }
 
