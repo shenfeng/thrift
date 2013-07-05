@@ -27,11 +27,12 @@ import (
 )
 
 type TBinaryProtocol struct {
-	trans            TTransport
+	trans           TTransport
 	strictRead      bool
 	strictWrite     bool
 	readLength      int
 	checkReadLength bool
+	buffer          [8]byte
 }
 
 type TBinaryProtocolFactory struct {
@@ -179,33 +180,22 @@ func (p *TBinaryProtocol) WriteByte(value byte) error {
 }
 
 func (p *TBinaryProtocol) WriteI16(value int16) error {
-	h := byte(0xff & (value >> 8))
-	l := byte(0xff & value)
-	v := []byte{h, l}
+	v := p.buffer[0:2]
+	binary.BigEndian.PutUint16(v, uint16(value))
 	_, e := p.trans.Write(v)
 	return NewTProtocolException(e)
 }
 
 func (p *TBinaryProtocol) WriteI32(value int32) error {
-	a := byte(0xff & (value >> 24))
-	b := byte(0xff & (value >> 16))
-	c := byte(0xff & (value >> 8))
-	d := byte(0xff & value)
-	v := []byte{a, b, c, d}
+	v := p.buffer[0:4]
+	binary.BigEndian.PutUint32(v, uint32(value))
 	_, e := p.trans.Write(v)
 	return NewTProtocolException(e)
 }
 
 func (p *TBinaryProtocol) WriteI64(value int64) error {
-	a := byte(0xff & (value >> 56))
-	b := byte(0xff & (value >> 48))
-	c := byte(0xff & (value >> 40))
-	d := byte(0xff & (value >> 32))
-	e := byte(0xff & (value >> 24))
-	f := byte(0xff & (value >> 16))
-	g := byte(0xff & (value >> 8))
-	h := byte(0xff & value)
-	v := []byte{a, b, c, d, e, f, g, h}
+	v := p.buffer[:]
+	binary.BigEndian.PutUint64(v, uint64(value))
 	_, err := p.trans.Write(v)
 	return NewTProtocolException(err)
 }
@@ -375,34 +365,34 @@ func (p *TBinaryProtocol) ReadBool() (bool, error) {
 }
 
 func (p *TBinaryProtocol) ReadByte() (value byte, err error) {
-	buf := []byte{0}
+	buf := p.buffer[0:1]
 	err = p.readAll(buf)
 	return buf[0], err
 }
 
 func (p *TBinaryProtocol) ReadI16() (value int16, err error) {
-	buf := []byte{0, 0}
+	buf := p.buffer[0:2]
 	err = p.readAll(buf)
 	value = int16(binary.BigEndian.Uint16(buf))
 	return value, err
 }
 
 func (p *TBinaryProtocol) ReadI32() (value int32, err error) {
-	buf := []byte{0, 0, 0, 0}
+	buf := p.buffer[0:4]
 	err = p.readAll(buf)
 	value = int32(binary.BigEndian.Uint32(buf))
 	return value, err
 }
 
 func (p *TBinaryProtocol) ReadI64() (value int64, err error) {
-	buf := []byte{0, 0, 0, 0, 0, 0, 0, 0}
+	buf := p.buffer[0:8]
 	err = p.readAll(buf)
 	value = int64(binary.BigEndian.Uint64(buf))
 	return value, err
 }
 
 func (p *TBinaryProtocol) ReadDouble() (value float64, err error) {
-	buf := []byte{0, 0, 0, 0, 0, 0, 0, 0}
+	buf := p.buffer[0:8]
 	err = p.readAll(buf)
 	value = math.Float64frombits(binary.BigEndian.Uint64(buf))
 	return value, err
