@@ -180,21 +180,15 @@ func (p *TBBinaryProtocol) WriteBool(value bool) error {
 }
 
 func (p *TBBinaryProtocol) WriteByte(value byte) error {
-	e := p.flushToFreeSpace(1)
-	if e != nil {
-		return NewTProtocolException(e)
-	}
+	p.moreWriteSpace(1)
+
 	p.wbuf.buffer[p.wbuf.pos] = value
 	p.wbuf.pos += 1
 	return nil
 }
 
 func (p *TBBinaryProtocol) WriteI16(value int16) error {
-	e := p.flushToFreeSpace(2)
-	if e != nil {
-		return NewTProtocolException(e)
-	}
-
+	p.moreWriteSpace(2)
 	binary.BigEndian.PutUint16(p.wbuf.buffer[p.wbuf.pos:], uint16(value))
 	p.wbuf.pos += 2
 
@@ -202,10 +196,7 @@ func (p *TBBinaryProtocol) WriteI16(value int16) error {
 }
 
 func (p *TBBinaryProtocol) WriteI32(value int32) error {
-	e := p.flushToFreeSpace(4)
-	if e != nil {
-		return NewTProtocolException(e)
-	}
+	p.moreWriteSpace(4)
 	binary.BigEndian.PutUint32(p.wbuf.buffer[p.wbuf.pos:], uint32(value))
 	p.wbuf.pos += 4
 
@@ -213,10 +204,7 @@ func (p *TBBinaryProtocol) WriteI32(value int32) error {
 }
 
 func (p *TBBinaryProtocol) WriteI64(value int64) error {
-	e := p.flushToFreeSpace(8)
-	if e != nil {
-		return NewTProtocolException(e)
-	}
+	p.moreWriteSpace(8)
 	binary.BigEndian.PutUint64(p.wbuf.buffer[p.wbuf.pos:], uint64(value))
 	p.wbuf.pos += 8
 
@@ -235,11 +223,7 @@ func (p *TBBinaryProtocol) WriteBinary(value []byte) error {
 
 	p.WriteI32(int32(len(value)))
 
-	e := p.flushToFreeSpace(len(value))
-	if e != nil {
-		return NewTProtocolException(e)
-	}
-
+	p.moreWriteSpace(len(value))
 	copy(p.wbuf.buffer[p.wbuf.pos:], value)
 	p.wbuf.pos += len(value)
 	return nil
@@ -481,11 +465,16 @@ func (p *TBBinaryProtocol) makeSureAvailable(space int) error {
 	return nil
 }
 
-func (p *TBBinaryProtocol) flushToFreeSpace(space int) error {
+func (p *TBBinaryProtocol) moreWriteSpace(space int) {
 	if p.wbuf.pos+space > p.wbuf.limit {
-		return p.Flush()
+		m := p.wbuf.limit * 2
+		if m < p.wbuf.pos+space {
+			m = p.wbuf.pos + space
+		}
+		b := make([]byte, m)
+		copy(b, p.wbuf.buffer[:p.wbuf.pos])
+		p.wbuf = &TBuffer{buffer: b, pos: p.wbuf.pos, limit: p.wbuf.limit * 2}
 	}
-	return nil
 }
 
 func (p *TBBinaryProtocol) Flush() (err error) {
